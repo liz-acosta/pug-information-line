@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     vonage_private_key_path: str
     vonage_webhook_url: str 
     app_name: str = "Customer Service Call Flow API"
-    debug: bool = True
     vonage_virtual_number: str
     app_host: str = "0.0.0.0"
     app_port: int = 3000

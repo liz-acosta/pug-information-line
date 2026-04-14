@@ -25,7 +25,7 @@ DEPARTMENT_KEYS = {
 }
 
 
-@app.get("/voice/incoming")
+@app.get("/webhooks/answer")
 async def incoming_call(request: Request):
     """
     Handle incoming call.
