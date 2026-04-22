@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from vonage_handler import vonage_handler
-from vonage import Vonage, Auth
 from vonage_voice import CreateCallRequest
 from database import db
 import requests
@@ -237,14 +236,7 @@ async def schedule_callback(
             print(f"Calling {phone_number} in {i} seconds ... ")
             await asyncio.sleep(1)
 
-        client = Vonage(
-            Auth(
-                api_key=settings.vonage_api_key,
-                api_secret=settings.vonage_api_secret,
-                application_id=settings.vonage_application_id,
-                private_key=settings.vonage_private_key_path,
-            )
-        )
+        client = vonage_handler.client
 
         ncco = [
             {
@@ -272,7 +264,7 @@ async def startup_event():
     """Initialize database and log startup."""
     print("Application starting up")
     print(f"Database path: {settings.database_path}")
-    print(f"Callback base URL: {settings.callback_base_url}")
+    print(f"ngrok URL: {settings.ngrok_url}")
     print("Sample customers seeded into database")
 
 

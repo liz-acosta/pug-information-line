@@ -24,11 +24,11 @@ class VonageHandler:
         Build the welcome menu NCCO with IVR options
         Demonstrates: Effective IVR with self-service + escape routes
         """
-        webhook = f"{settings.vonage_webhook_url}/ivr/menu-selection"
+        webhook = f"{settings.ngrok_url}/ivr/menu-selection"
         greeting = "Welcome to our customer service. Press 1 for billing, 2 for technical support, or 3 for account management. Press 0 to speak with an operator."
 
         ncco = [
-            {"action": "talk", "text": greeting, "bargeIn": True},
+            {"action": "talk", "text": greeting, "style": 11, "bargeIn": True},
             {
                 "action": "input",
                 "type": ["dtmf"],
@@ -58,12 +58,7 @@ class VonageHandler:
             customer_name = call_info.get("customer")["name"]
             greeting = f"Hello {customer_name}, welcome back. The information you requested is as follows: {department_info}."
 
-        greeting_ncco = [
-            {
-                "action": "talk",
-                "text": greeting,
-            }
-        ]
+        greeting_ncco = [{"action": "talk", "text": greeting, "style": 11}]
         recording_ncco = self.build_recording_ncco(uuid)
         return greeting_ncco + recording_ncco
 
@@ -80,12 +75,7 @@ class VonageHandler:
         greeting = "I'm sorry, all operators are currently busy. We will call you back in a moment when an operator becomes available."
 
         ncco = [
-            {
-                "action": "talk",
-                "text": greeting,
-                "language": "en-US",
-                "voice_name": "Amy",
-            },
+            {"action": "talk", "text": greeting, "style": 11},
         ]
 
         # Schedule callback in 30 seconds
@@ -100,12 +90,12 @@ class VonageHandler:
         Demonstrates: Logging customer interactions in CRM
         """
 
-        webhook = f"{settings.vonage_webhook_url}/webhooks/recording?uuid={uuid}"
+        webhook = f"{settings.ngrok_url}/webhooks/recording?uuid={uuid}"
 
         greeting = "Thank you for calling. Please leave a message about the quality of this call. Press the pound key when you are done."
 
         ncco = [
-            {"action": "talk", "text": greeting},
+            {"action": "talk", "style": 11, "text": greeting},
             {
                 "action": "record",
                 "endOnKey": "#",
@@ -117,7 +107,11 @@ class VonageHandler:
                     "language": "en-US",
                 },
             },
-            {"action": "talk", "text": "Thank you for your message. Goodbye."},
+            {
+                "action": "talk",
+                "text": "Thank you for your message. Goodbye.",
+                "style": 11,
+            },
         ]
 
         return ncco
@@ -145,14 +139,7 @@ class VonageHandler:
                 print(f"Calling {phone_number} in {i} seconds ... ")
                 await asyncio.sleep(1)
 
-            ncco = [
-                {
-                    "action": "talk",
-                    "text": greeting,
-                    "language": "en-US",
-                    "voice_name": "Amy",
-                }
-            ]
+            ncco = [{"action": "talk", "text": greeting, "style": 11}]
 
             print(f"Now returning call to: ==> {phone_number}")
 
@@ -176,14 +163,7 @@ class VonageHandler:
         """
 
         greeting = "Sorry, I didn't understand that input. Please try again."
-        greeting_ncco = [
-            {
-                "action": "talk",
-                "text": greeting,
-                "language": "en-US",
-                "voice_name": "Amy",
-            }
-        ]
+        greeting_ncco = [{"action": "talk", "text": greeting, "style": 11}]
         return greeting_ncco
 
 

@@ -1,10 +1,6 @@
 import sqlite3
-from pathlib import Path
-from datetime import datetime
 from typing import Optional, Dict, Any
-
-YOUR_PHONE_NUMBER="your pone number here"
-YOUR_NAME="your name here"
+from config import settings
 
 class CallDatabase:
     def __init__(self, db_path: str = "customer_calls.db"):
@@ -55,7 +51,7 @@ class CallDatabase:
             ("14155550103", "Carol White", "ACC003",
              "Current plan: Basic, $9.99/month. Last payment: 2026-04-03",
              "Loyal customer since 2025. Interested in API access."),
-             (YOUR_PHONE_NUMBER, YOUR_NAME, "ACC004",
+             (settings.your_phone_number, settings.your_name, "ACC004",
              "Current plan: Basic, $9.99/month. Last payment: 2026-04-03",
              "Loyal customer since 2025. Interested in API access.")
         ]

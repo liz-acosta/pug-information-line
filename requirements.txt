@@ -2,5 +2,4 @@ fastapi
 uvicorn
 vonage
 python-dotenv
-pydantic
 pydantic-settings
