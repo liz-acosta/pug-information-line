@@ -78,7 +78,7 @@ class VonageHandler:
             {"action": "talk", "text": greeting, "style": 11},
         ]
 
-        # Schedule callback in 30 seconds
+        # Schedule callback in configured seconds
         from_number = call_info.get("from")
         asyncio.create_task(self.schedule_callback(from_number, uuid, call_info))
 
