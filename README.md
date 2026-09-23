@@ -1,119 +1,127 @@
-# Customer Service Call Flow Application
+# 🐾 Pug Information Line
 
-A minimal Python application demonstrating best practices for customer service call flows using FastAPI and Vonage APIs. It uses a SQLite database to simulate a CRM used for call personalization and interaction logging.
+A Python IVR (Interactive Voice Response) application that answers your most pressing pug-related questions over the phone. The application is powered by [FastAPI](https://fastapi.tiangolo.com/) and the [Vonage Voice API](https://developer.vonage.com/en/voice/voice-api/overview).
 
-## Features
+Call a Vonage virtual number, navigate a voice menu using your keypad or your actual voice, and get information about pug history, care needs, and nearby rescue organizations.
 
-- **Effective IVR System**: Self-service menu options with escape routes for complex calls
-- **Voice Quality**: Text-to-speech using Vonage Voice API with a voice that is styled to sound more natural
-- **CRM Integration**: Customer lookup and personalized greetings based on previous interactions
-- **Skills-Based Routing**: DTMF input routes calls to appropriate departments
-- **Error Handling**: Graceful fallbacks and callback options when agents are unavailable
-- **Interaction Logging**: All calls and messages recorded in SQLite database
+## How It Works
 
-# How To Get This Code Running
+### Features
 
-## Prerequisites
-- Python 3.8+
-- A [Vonage API account](https://vonage.dev/4dtSoCc)
-- An [ngrok account and installation](https://developer.vonage.com/en/blog/local-development-nexmo-ngrok-tunnel-dr/)
+- **Multimodal input**: Accepts both DTMF (dual-tone multi-frequency aka keypad) and speech input for menu navigation
+- **Natural-sounding TTS**: Text-to-speech responses styled to sound more conversational (Vonage Voice API, style 11)
+- **Location-aware rescue lookup**: Enter your zip code to find pug rescue organizations in your region
+- **Graceful error handling**: Fallback responses and automatic re-prompt on unrecognized input
 
-## Setup
-
-### Create an account with ngrok and install it
-The Voice API must be able to access your webhook so that it can make requests to it, therefore, the endpoint URL must be accessible over the public internet.
-
-In order to do that for this tutorial, we will use [ngrok](https://ngrok.com/). Check out our [ngrok tutorial](https://developer.vonage.com/en/blog/local-development-nexmo-ngrok-tunnel-dr/) to learn how to install and use it.
-
-### Spin up an ngrok tunnel
-
-In a separate terminal window, run:
+### IVR menu
 
 ```
+Welcome to the Pug Information Line.
+
+  Press 1  (or say "learn about pugs")    → Breed history & characteristics
+  Press 2  (or say "pug care needs")      → Health, grooming & training tips
+  Press 3  (or say "local pug rescues")   → Enter your zip code to find nearby rescues
+```
+
+### Project structure
+
+```
+.
+├── main.py              # FastAPI app and webhook handlers (/answer, /event, /ivr/menu-selection)
+├── vonage_handler.py    # Builds Vonage NCCO (call control) objects
+├── ivr_handlers.py      # Processes DTMF/speech input and regional rescue lookup logic
+├── pug_information.py   # All IVR response copy and rescue data keyed by US zip region
+├── config.py            # Pydantic settings loaded from .env
+├── requirements.txt     # Python dependencies
+├── .env_template        # Environment variables template
+└── .gitignore
+```
+
+## Prerequisites
+
+- Python 3.8+
+- A [Vonage API account](https://dashboard.nexmo.com/sign-up)
+- An [ngrok account](https://ngrok.com/) and installation
+
+## How to Get This Code Running
+
+### 1. Set up ngrok
+
+The Vonage Voice API needs a publicly accessible webhook URL to reach your local server. ngrok creates a secure tunnel for this.
+
+[Install ngrok](https://ngrok.com/download), then in a separate terminal window run:
+
+```bash
 ngrok http 3000
 ```
 
-This command will generate the public URLs your local server will tunnel to on port 3000. Take note of the public URL – it should look something like this:
+Note the generated forwarding URL -- it will look like this:
+
+```
+https://your-subdomain.ngrok-free.app -> http://localhost:3000
+```
+
+### 2. Create a Vonage account and purchase a number
+
+Sign up at the [Vonage developer dashboard](https://dashboard.nexmo.com) and purchase a virtual phone number with Voice capabilities enabled.
+
+### 3. Create a Voice API application and link your number
+
+1. In the dashboard, go to **Applications → Create new application**
+2. Give it a name (e.g., `pug-information-line`)
+3. Toggle **Voice** under Capabilities
+4. Set the **Answer URL** to your ngrok URL + `/answer`:
+   ```
+   https://your-subdomain.ngrok-free.app/answer
+   ```
+5. Set the **Event URL** to your ngrok URL + `/event`:
+   ```
+   https://your-subdomain.ngrok-free.app/event
+   ```
+6. Click **Generate new application**
+7. Link your purchased number to the application
+
+### 4. Run the code
+
+**Create and activate a Python virtual environment:**
 
 ```bash
-Forwarding                	https://some-public-url.ngrok-free.app -> http://localhost:3000
+virtualenv venv && source venv/bin/activate
 ```
 
-### Create a Vonage account and purchase a number
+**Install dependencies:**
 
-You will need a [Vonage API account](https://vonage.dev/4dtSoCc) and a virtual phone number. You can purchase a number from the [developer dashboard](https://dashboard.vonage.com/numbers/buy-numbers). Make sure to buy a number in your country code and with the appropriate features.
-
-### Create a Voice API application and link your number to it
-
-Create your Voice API application in the [developer dashboard](https://dashboard.vonage.com/applications) by navigating to the **Applications** window from the left hand menu and clicking the “Create new application” button. This will open the application creation menu. Give your application a human-friendly name like `vonage-hello-world`.
-
-Under the **Capabilities** section, toggle the option for **Voice**, which will reveal a list of text fields. In the text field labeled **Answer URL**, provide the ngrok public URL amended with the webhook defined in the FastAPI app. This will look something like: `https://some-public-url.ngrok-free.app/webhooks/answer`.
-
-Click the “Generate new application” button.
-
-![A screenshot of the Create an application menu in the Vonage developer dashboard.](images/2026-02_screenshot_handle-inbound-call_create-application.png)
-
-Now that your application has been created, you can link your number to it by clicking on the **Link** button in the table of available numbers. Your application is now ready to answer inbound calls.
-
-## Run the code
-
-### 1. Create and activate a Python virtual environment
-
-```
-virtuanlenv venv && source venv/bin/activate
-```
-### 2. Install dependencies
-```
+```bash
 pip install -r requirements.txt
 ```
-### 3. Obtain all your Vonage secrets
 
-In the developer dashboard [Applications menu](https://dashboard.vonage.com/applications), click on your application and then click **Edit**. Once the edit window opens, click on the button that says, “Generate public and private key”. This will trigger a download of your private key as a file with the extension `.key`. **Keep this file private and do not share it anywhere it could be compromised.**
+**Configure environment variables:**
 
-Click on the "Save changes button" and also note your Application ID.
+Copy `.env_template` to `.env` and fill in the values:
 
-![A screenshot of the application Edit menu in the Vonage developer dashboard showing where to generate a public and private key.](images/2026-02_screenshot_handle-inbound-call_generate-key.png)
-
-![A screenshot of the Voice application in the Vonage developer dashboard indicating where you can find the application ID.](images/2026-02_handle-inbound-call_application-id.png)
-
-Vonage uses [signed webhooks](https://vonage.dev/4bvezp1) to include a JWT in the authorization header of certain requests. You can find your signature secret in the Vonage developer dashboard in the [settings menu](https://dashboard.vonage.com/settings) under **Signed webhooks**.
- 
-![A screenshot of the settings menu in the Vonage developer dashboard showing where to obtain the signature secret.](images/202603_screenshot_account-settings-signed-webhooks.png)
-
-### 3. Configure your environment variables
-
-Move your private key file to your project directory and configure the variables in the `.env_template` file accordingly:
-
-| Variable name           | Variable value                                                                              |
-|-------------------------|---------------------------------------------------------------------------------------------|
-| VONAGE_API_SECRET       | This can be found in the Vonage developer dashboard under  **API Settings**                 |
-| VONAGE_API_KEY          | This can be found in the settings of the Voice application you created for this sample code |
-| VONAGE_APPLICATION_ID   | This is the Vonage-generated ID of the Voice application you created for this sample code   |
-| VONAGE_PRIVATE_KEY_PATH | This is the path to the **private.key** file you downloaded from the developer dashboard    |
-| VONAGE_VIRTUAL_NUMBER   | The Vonage virtual number you linked to your Voice application                              |
-| NGROK_URL               | This refers to the URL generated by ngrok                                                   |
-| YOUR_PHONE_NUMBER       | Your phone number to be referenced in the SQLite database                                   |
-| YOUR_NAME               | Your name to be referenced in the SQLite database                                           |
-
-Then update the name of the file from `.env_template` to `.env`.
-
-### 4. Run the app
-
-To spin up the app, run the following:
-
-`python main.py`
-
-### 5. Try it out!
-
-Call the virtual number you linked to the application in the dashboard. If everything is working correctly, you should be greeted with a menu of options.
-
-When selecting menu options 1 - 3, you should be routed to the associated department and greeted by name with the requested information. You will also be asked to record a message which will then be transcribed and logged as an interaction associated with your entry in the database.
-
-**Please note:** Transcription is a chargeable feature. Check the [Voice API Pricing page](https://www.vonage.co.uk/communications-apis/voice/pricing/) for rates.
-
-You can verify the logged interaction by opening another terminal window and from the project root directory, running `sqlite3 customer_calls.db` and then `select * from call_interactions;`. You should see a logged interaction, along with a transcript of your message. It should look something like this:
-```
-1|4|support|Customer left voicemail|I'm leaving a message.|0|IVR System|2026-04-14 04:17:10
+```bash
+cp .env_template .env
 ```
 
-When selecting menu option 0 for Operator, you should be informed that you will be called back after 10 seconds. After 10 seconds, you will receive a call back. 
+| Variable | Description |
+|----------|-------------|
+| `NGROK_URL` | Your ngrok forwarding URL (e.g., `https://your-subdomain.ngrok-free.app`) |
+
+**Start the app:**
+
+```bash
+python main.py
+```
+
+## Try It Out!
+
+Call the Vonage virtual number you linked to the application. You should be greeted with the menu.
+
+- **Options 1 & 2**: Hear pug breed info or care tips
+- **Option 3**: Enter your 5-digit zip code on the keypad (followed by `#`) to get a list of pug rescue organizations near you
+
+## Notes
+
+- Rescue organization data in `pug_information.py` is hardcoded by US zip code region prefix and intended for demo use
+
+![A funny gif of a pug with human hands trying to eat a cookie that is just out of reach.](lunch-pugs.gif)
