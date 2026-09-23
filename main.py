@@ -1,69 +1,55 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from vonage_handler import vonage_handler
-from vonage_voice import CreateCallRequest
-from database import db
-import requests
+from vonage_handler import (
+    build_welcome_menu_ncco,
+    build_response_ncco,
+    get_zip_code_ncco,
+    build_error_ncco,
+)
+from ivr_handlers import dtmf_response, speech_response, find_pug_rescues
+
+
 from config import settings
-import asyncio
-from datetime import datetime
-from vonage_jwt.jwt import JwtClient
+from pug_information import RESCUE_INPUTS
 
 app = FastAPI(title="Customer Service Call Flow API")
 
-# In-memory store for active calls (for demo purposes)
-active_calls = {}
 
-# Department mapping for DTMF selections
-DEPARTMENT_MAP = {"1": "billing", "2": "support", "3": "account", "0": "operator"}
-
-DEPARTMENT_KEYS = {
-    "billing": "billing_info",
-    "support": "support_notes",
-    "account": "support_notes",
-}
-
-
+# Webhook: Answer the call
 @app.get("/answer")
 async def incoming_call(request: Request):
     """
-    Handle incoming call.
-    Demonstrates: Initial IVR menu + graceful error handling
+    Handle incoming call
     """
     try:
-        body = request.query_params
-        from_number = body.get("from")
-        to_number = body.get("to")
-        uuid = body.get("uuid")
+        data = request.query_params
 
-        print(f"INCOMING CALL: ===> {body}")
-
-        # Store call info
-        active_calls[uuid] = {
-            "from": from_number,
-            "to": to_number,
-            "start_time": datetime.now(),
-            # Get customer data if it is in the database, returns None if not in database
-            "customer": db.get_customer_by_phone(from_number),
-        }
-        print(f"STORING CALL INFO: ===> {active_calls[uuid]}")
+        print(f"INCOMING CALL: ===> {data}")
 
         # Build the welcome menu NCCO
-        ncco = vonage_handler.build_welcome_menu_ncco()
+        ncco = build_welcome_menu_ncco()
 
-        return JSONResponse(content=ncco)
+        return ncco
 
     except Exception as e:
         print(f"Error handling incoming call: {str(e)}")
-        ncco = vonage_handler.build_error_ncco()
-        return JSONResponse(content=ncco)
+        ncco = build_error_ncco()
+        return ncco
 
 
+# Webhook: Call status events
+@app.post("/event")
+async def event(request: Request):
+    data = await request.json()
+    print(f"Call event: {data.get('status', 'unknown')} | UUID: {data.get('uuid')}")
+    return JSONResponse(content={"status": "ok"})
+
+
+# Webhook: Handle the IVR menu selection
 @app.post("/ivr/menu-selection")
 async def handle_dtmf(request: Request):
     """
-    Handle DTMF input from IVR menu.
-    Demonstrates: Skills-based routing + escape routes for complex calls
+    Handle DTMF or speech input from IVR menu
     """
 
     try:
@@ -72,214 +58,43 @@ async def handle_dtmf(request: Request):
         data = await request.json()
         dtmf_digits = data.get("dtmf", {}).get("digits")
         speech_results = data.get("speech", {}).get("results", [])
-        
-    
-        rescue_inputs = ["local", "pug", "rescues"]
 
-        if dtmf_digits == "3" or speech_results in rescue_inputs:
-        response =  
-        dtmf = body.get("dtmf").get("digits")
-        uuid = body.get("uuid")
-        department = DEPARTMENT_MAP[dtmf]
-
-        print(f"MENU SELECTION: ===>  {dtmf}")
-        print(f"DTMF INPUT: ===>  {dtmf} for call: ===> {uuid}")
-        print(f"DEPARTMENT: ===> {department}")
-
-        # Validate DTMF input
-        if dtmf not in DEPARTMENT_MAP:
-            print(f"Invalid DTMF: {dtmf}")
-            ncco = vonage_handler.build_error_ncco()
-            return JSONResponse(content=ncco)
-
-        # Get call info from in-memory
-        call_info = active_calls.get(uuid, {})
-        customer = call_info.get("customer")
-        # Add the selected department to the call info
-        active_calls[uuid]["department"] = department
-
-        print(f"EXISTING CUSTOMER INFO: ===> {customer}")
-
-        # If caller selects OPERATOR, build operator greeting, which will also schedule a call back
-        if department == "operator":
-            print(f"Operator requested by: ===> {call_info.get('from')}")
-            ncco = vonage_handler.build_operator_greeting_ncco(uuid, call_info)
-            return JSONResponse(content=ncco)
-
-        # Route to department
-        if customer:
-            # Personalized routing with CRM integration
-            print(
-                f"Routing known customer: ===> {customer['name']} to department: ===> {department}"
-            )
-
-            # Get the customer data related to selected department
-            active_calls[uuid]["customer_id"] = customer["id"]
-            department_key = DEPARTMENT_KEYS.get(department, "support_notes")
-            department_info = customer.get(department_key, "account information")
-            ncco = vonage_handler.build_customer_greeting_ncco(
-                uuid, call_info, department_info
-            )
-
-        else:
-            # General routing
-            print(f"Routing call to: ===> {department}")
-            ncco = vonage_handler.build_customer_greeting_ncco(uuid, call_info)
-
-        return JSONResponse(content=ncco)
-
-    except Exception as e:
-        print(f"Error handling DTMF: {str(e)}")
-        ncco = vonage_handler.build_error_ncco()
-        return JSONResponse(content=ncco)
-
-
-@app.post("/webhooks/recording")
-async def handle_recording(request: Request):
-    """
-    Handle recording completion and transcription.
-    Demonstrates: CRM logging of interactions + error handling
-    """
-
-    try:
-        print("Handling message recording ... ")
-
-        body = await request.json()
-        uuid = request.query_params.get("uuid")
-        transcription_url = body.get("transcription_url")
-
-        # Get call info from in-memory
-        call_info = active_calls.get(uuid, {})
-        phone_number = call_info["from"]
-
-        print(f"Transcription obtained for call from: ===> {phone_number}")
-        print("TRANSCRIPTION URL: ===> ", transcription_url)
-
-        # Get customer from database if entry exists, otherwise this returns None
-        customer = db.get_customer_by_phone(phone_number)
-        print(f"CUSTOMER IN DATABASE: ===> {customer}")
-
-        if transcription_url:
-
-            # Get the transcription
-            jwt_client = JwtClient(
-                application_id=settings.vonage_application_id,
-                private_key=settings.vonage_private_key_path,
-            )
-            jwt_token = jwt_client.generate_application_jwt()
-
-            response = requests.get(
-                transcription_url,
-                headers={"Authorization": f"Bearer {jwt_token.decode()}"},
-            )
-
-            # Get transcription
-            transcription_data = response.json()
-
-            for channel in transcription_data.get("channels", []):
-                for segment in channel.get("transcript", []):
-                    sentence = segment.get("sentence")
-                    transcription = sentence
-
-            # If the customer is in the database, make an entry of this interaction
-            if customer:
-                department = call_info["department"]
-
-                # Log the interaction
-                interaction_id = db.log_interaction(
-                    customer_id=customer["id"],
-                    call_type=department,
-                    message="Customer left voicemail",
-                    transcription=transcription,
-                    agent_name="IVR System",
-                )
-
-                print(
-                    f"Logged interaction: ===> {interaction_id} for customer: ===> {customer["id"],}"
-                )
-
+        if dtmf_digits:
+            print(f"CALLER INPUT IS DTMF: ===> {dtmf_digits}")
+            if dtmf_digits == "3":
+                print("Caller requested local pug rescues, getting zip code now ... ")
+                ncco = get_zip_code_ncco()
+                return ncco
+            elif len(dtmf_digits) == 5:
+                response_text = find_pug_rescues(dtmf_digits)
             else:
-                # If customer is not in the database, add them
-                result = db.insert_customer_and_log_interaction(
-                    phone_number=call_info.get("from"),
-                    call_type=department,
-                    support_notes="New customer",
-                    transcription=transcription,
-                )
+                response_text = dtmf_response(dtmf_digits)
 
-                print(
-                    f"Created customer {result['customer_id']} with interaction {result['interaction_id']}"
-                )
+        elif speech_results:
+            print(f"CALLER INPUT IS SPEECH: ===> {speech_results}")
+            if any(
+                word in speech_results[0].get("text", "").lower()
+                for word in RESCUE_INPUTS
+            ):
+                print("Caller requested local pug rescues, getting zip code now ... ")
+                ncco = get_zip_code_ncco()
+                return ncco
+            else:
+                response_text = speech_response(speech_results)
 
-        return JSONResponse(content={"status": "recorded"})
-
-    except Exception as e:
-        print(f"Error handling recording: {str(e)}")
-        return JSONResponse(
-            content={"status": "error", "message": str(e)}, status_code=500
-        )
-
-
-async def schedule_callback(
-    phone_number: str, original_uuid: str, delay_seconds: int = 60
-):
-    """
-    Schedule a callback to the customer after delay.
-    Demonstrates: Graceful error handling with follow-up contact.
-    """
-
-    try:
-        print(
-            f"Scheduling callback to: ===> {phone_number} in: ===> {delay_seconds} seconds"
-        )
-        customer = db.get_customer_by_phone(phone_number)
-
-        if customer:
-            greeting = f"Hello {customer["name"]}. We are calling you back. You can hang up now."
         else:
-            greeting = "Hello. We are calling you back. You can hang up now."
+            print("ERROR: Unrecognized input")
+            raise ValueError(f"Unrecognized caller input")
 
-        # Wait for the specified delay
-        for i in range(delay_seconds, 0, -1):
-            print(f"Calling {phone_number} in {i} seconds ... ")
-            await asyncio.sleep(1)
+        ncco = build_response_ncco(response_text)
 
-        client = vonage_handler.client
-
-        ncco = [
-            {
-                "action": "talk",
-                "text": greeting,
-                "language": "en-US",
-                "voice_name": "Amy",
-            }
-        ]
-
-        call = CreateCallRequest(
-            to=[{"type": "phone", "number": phone_number}],
-            ncco=ncco,
-            random_from_number=True,
-        )
-
-        client.voice.create_call(call)
+        return ncco
 
     except Exception as e:
-        print(f"Error in callback scheduling: {str(e)}")
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and log startup."""
-    print("Application starting up")
-    print(f"Database path: {settings.database_path}")
-    print(f"ngrok URL: {settings.ngrok_url}")
-    print("Sample customers seeded into database")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Log shutdown."""
-    print("Application shutting down")
+        print(f"Error handling caller input: {str(e)}")
+        error_ncco = build_error_ncco()
+        main_menu_necco = build_welcome_menu_ncco()
+        return error_ncco + main_menu_necco
 
 
 if __name__ == "__main__":
