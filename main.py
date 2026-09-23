@@ -24,7 +24,7 @@ DEPARTMENT_KEYS = {
 }
 
 
-@app.get("/webhooks/answer")
+@app.get("/answer")
 async def incoming_call(request: Request):
     """
     Handle incoming call.
@@ -69,7 +69,15 @@ async def handle_dtmf(request: Request):
     try:
         print("Routing call to menu selection ... ")
 
-        body = await request.json()
+        data = await request.json()
+        dtmf_digits = data.get("dtmf", {}).get("digits")
+        speech_results = data.get("speech", {}).get("results", [])
+        
+    
+        rescue_inputs = ["local", "pug", "rescues"]
+
+        if dtmf_digits == "3" or speech_results in rescue_inputs:
+        response =  
         dtmf = body.get("dtmf").get("digits")
         uuid = body.get("uuid")
         department = DEPARTMENT_MAP[dtmf]

@@ -1,5 +1,12 @@
-from vonage import Auth
-import vonage
+from vonage_voice import (
+    NccoAction,
+    Talk,
+    Connect,
+    Input,
+    Dtmf,
+    Speech,
+    WebsocketEndpoint,
+)
 from config import settings
 import json
 from typing import List, Dict
@@ -25,20 +32,66 @@ class VonageHandler:
         Demonstrates: Effective IVR with self-service + escape routes
         """
         webhook = f"{settings.ngrok_url}/ivr/menu-selection"
-        greeting = "Welcome to our customer service. Press 1 for billing, 2 for technical support, or 3 for account management. Press 0 to speak with an operator."
+        
+        greeting = "Welcome to the pug information line. Press 1 or say 'learn about pugs' to hear more about this ancient dog breed. Press 2 or say 'pug care needs' to learn about how to care for a pug. Press 3 or say 'local pug rescues' if you are ready to adopt a pug."
 
-        ncco = [
-            {"action": "talk", "text": greeting, "style": 11, "bargeIn": True},
-            {
-                "action": "input",
-                "type": ["dtmf"],
-                "dtmf": {"maxDigits": 1, "timeOut": 3},
-                "eventUrl": [webhook],
-                "eventMethod": "POST",
-            },
-        ]
+        speech_input_context = ["learn about pugs", "pug care needs", "local pug rescues"]
+        
+        dtmf_options = Dtmf(maxDigits=1, timeOut=3)
+        speech_options = Speech(language='en-US', endOnSilence=3, context=speech_input_context)
 
-        return ncco
+        ncco: list[NccoAction] = [
+        Talk(text=greeting, language="en-US", style=11, bargeIn=True),
+        Input(type=['dtmf', 'speech'], dtmf=dtmf_options, speech=speech_options, eventUrl=[webhook], eventMethod="POST")]
+        # ncco = [
+        #     {"action": "talk", "text": greeting, "style": 11, "bargeIn": True},
+        #     {
+        #         "action": "input",
+        #         "type": ["dtmf"],
+        #         "dtmf": {"maxDigits": 1, "timeOut": 3},
+        #         "eventUrl": [webhook],
+        #         "eventMethod": "POST",
+        #     },
+        # ]
+
+        return [action.model_dump(by_alias=True, exclude_none=True) for action in ncco]
+    
+    def get_zip_code_ncco(self) -> List[Dict]:
+        """
+        Build the welcome menu NCCO with IVR options
+        Demonstrates: Effective IVR with self-service + escape routes
+        """
+        webhook = f"{settings.ngrok_url}/ivr/menu-selection"
+        
+        greeting = "You selected local pug rescues. Please use the keypad to enter your zipcode followed by the pound key."
+
+        
+        dtmf_options = Dtmf(maxDigits=5, timeOut=5, submitOnHash=True)
+        
+
+        ncco: list[NccoAction] = [
+        Talk(text=greeting, language="en-US", style=11, bargeIn=True),
+        Input(type=['dtmf'], dtmf=dtmf_options, eventUrl=[webhook], eventMethod="POST")]
+        # ncco = [
+        #     {"action": "talk", "text": greeting, "style": 11, "bargeIn": True},
+        #     {
+        #         "action": "input",
+        #         "type": ["dtmf"],
+        #         "dtmf": {"maxDigits": 1, "timeOut": 3},
+        #         "eventUrl": [webhook],
+        #         "eventMethod": "POST",
+        #     },
+        # ]
+
+        return [action.model_dump(by_alias=True, exclude_none=True) for action in ncco]
+    
+    def build_response_ncco(response_text):
+        
+        ncco: list[NccoAction] = [
+        Talk(text=greeting, language="en-US", style=11, bargeIn=True),
+        Input(type=['dtmf', 'speech'], dtmf=dtmf_options, speech=speech_options, eventUrl=[webhook], eventMethod="POST")]
+        
+
 
     def build_customer_greeting_ncco(
         self,
